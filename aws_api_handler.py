@@ -168,10 +168,14 @@ def update_meter_data(aws=False):
     bucket_name = os.getenv("S3_BUCKET_NAME")
     file_key = os.getenv("FILE_KEY")
 
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    file_path = os.path.join(script_dir, "meter_data.csv")
+
+
     if aws:
         df = download_file_from_s3(bucket_name, file_key)
     else:
-        df = pd.read_csv("meter_data.csv")
+        df = pd.read_csv(file_path)  
 
     df['date'] = pd.to_datetime(df['date'])
 
@@ -208,7 +212,7 @@ def update_meter_data(aws=False):
         else:
             df = reshaped_df
 
-        df.to_csv("meter_data.csv", index=False)
+        df.to_csv(file_path, index=False)
 
         if aws:
             upload_file_to_s3(bucket_name, file_key, df)
