@@ -99,76 +99,80 @@ def upload_file_to_s3(bucket_name, file_key, df):
         print(f"Error uploading file to S3: {e}")
 
 
-def fetch_missing_data(start_date, end_date):
+def fetch_missing_data(start_date, end_date, aws=False):
     """
-    Fetches data for any specified missing date range and updates the current meter data file on S3.
+    Fetches data for any specified missing date range and updates the current meter data file.
 
     Args:
         start_date (str): Start date for missing data.
         end_date (str): End date for missing data.
+        aws (bool): Updates meter_data.csv file in AWS S3 bucket if true
     """
     bucket_name = os.getenv("S3_BUCKET_NAME")
     file_key = os.getenv("FILE_KEY")
 
-    # Download the current meter data from S3
-    df = download_file_from_s3(bucket_name, file_key)
+    if aws:
+        df = download_file_from_s3(bucket_name, file_key)
 
-    # Ensure 'date' column is in datetime format
+    else:
+        df = pd.read_csv("meter_data.csv")
+
     df['date'] = pd.to_datetime(df['date'])
 
-    # Fetch new data from the API
     new_data_json = fetch_api_data(start_date, end_date)
 
     if new_data_json:
         new_data = new_data_json.get("energyDetails", {}).get("meters", [])
         rows = []
 
-        # Extract the data from the API response
         for meter in new_data:
             meter_type = meter['type']
             for value in meter['values']:
                 row = {
                     'date': value['date'],
                     'type': meter_type,
-                    'value': value.get('value', 0)
+                    'value': value.get('value', None)
                 }
                 rows.append(row)
 
-        # Convert new data into a DataFrame
         new_data_df = pd.DataFrame(rows)
 
-        # Ensure 'date' column in new data is in datetime format
         new_data_df['date'] = pd.to_datetime(new_data_df['date'])
 
-        # Reshape the new data
         reshaped_df = new_data_df.pivot_table(index='date', columns='type', values='value', aggfunc='last')
         reshaped_df.reset_index(inplace=True)
 
-        # Append the new data to the existing data, keeping only the unique dates
         df = pd.concat([df, reshaped_df]).drop_duplicates(subset='date', keep='last')
 
-        # Upload the updated file back to S3
-        upload_file_to_s3(bucket_name, file_key, df)
-        print(f"Updated data successfully uploaded to S3 with key: {file_key}")
+        df.to_csv("meter_data.csv", index=False)
+
+        if aws:
+            upload_file_to_s3(bucket_name, file_key, df)
+            print(f"Updated data successfully uploaded to S3 with key: {file_key}")
+
     else:
         print("No new data found for the specified date range.")
 
 
-def update_meter_data():
+def update_meter_data(aws=False):
     """
-    Updates the meter_data.parquet file stored in S3 by appending the latest energy data
-    from the SolarEdge API.
+    Updates the meter_data.csv file by appending the latest energy data from the SolarEdge API.
 
     Args:
-        None
+        aws (bool): updates meter_data file in AWS S3 bucket if true
 
     Returns:
         None
     """
+
     bucket_name = os.getenv("S3_BUCKET_NAME")
     file_key = os.getenv("FILE_KEY")
 
-    df = download_file_from_s3(bucket_name, file_key)
+    if aws:
+        df = download_file_from_s3(bucket_name, file_key)
+    else:
+        df = pd.read_csv("meter_data.csv")
+
     df['date'] = pd.to_datetime(df['date'])
 
     if df.empty:
@@ -190,7 +194,7 @@ def update_meter_data():
                 row = {
                     'date': value['date'],
                     'type': meter_type,
-                    'value': value.get('value', 0)
+                    'value': value.get('value', None)
                 }
                 rows.append(row)
 
@@ -204,6 +208,10 @@ def update_meter_data():
         else:
             df = reshaped_df
 
-        upload_file_to_s3(bucket_name, file_key, df)
+        df.to_csv("meter_data.csv", index=False)
+
+        if aws:
+            upload_file_to_s3(bucket_name, file_key, df)
+
     else:
         print("No new data fetched from the API.")
