@@ -15,10 +15,11 @@ def plot_energy_data(column_name="Consumption"):
     """
 
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    file_path = os.path.join(script_dir, f"{column_name}.html")
+    meter_data_file_path = os.path.join(script_dir, "meter_data.csv")
+    html_file_path = os.path.join(script_dir, f"{column_name}.html")
 
     # Get data
-    data = pd.read_csv("meter_data.csv")
+    data = pd.read_csv(meter_data_file_path) 
     data["date"] = pd.to_datetime(data["date"])
 
     # Convert from watts to kilowatts
@@ -28,7 +29,7 @@ def plot_energy_data(column_name="Consumption"):
     today_start = pd.Timestamp.now().normalize()
     today_end = today_start + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
     day_data = data[(data["date"] >= today_start) & (data["date"] <= today_end)]
-
+    
     # Aggregating for less granular views
     week_data = data.groupby(data["date"].dt.floor("1h")).agg({column_name: "sum"}).reset_index()
     month_data = data.groupby(data["date"].dt.floor("1D")).agg({column_name: "sum"}).reset_index()
@@ -115,7 +116,7 @@ def plot_energy_data(column_name="Consumption"):
     # fig.show()
 
     # Save the figure as html file
-    fig.write_html(file_path)
+    fig.write_html(html_file_path)
 
 
 def update_html_plots():
