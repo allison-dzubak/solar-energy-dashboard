@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from aws_api_handler import update_meter_data, download_file_from_s3
+from charts import update_html_plots
 
 # Load environment variables from .env file
 load_dotenv()
@@ -15,3 +16,6 @@ FILE_KEY = os.getenv("FILE_KEY")
 
 # Update 'meter_data.csv' with most recent API data
 update_meter_data()
+
+# Update html plots
+update_html_plots()
